@@ -575,6 +575,10 @@ perform_chat() {
                 else echo -e "\033[0;31m$first_body_line\033[0m"; fi
             fi
             if [[ -n "$curl_err" ]]; then echo -e "\033[0;31m$curl_err\033[0m"; fi
+            combined_err="${http_status} ${api_error_message} ${first_body_line}"
+            if echo "$combined_err" | grep -qiE 'content.filter|safety|inappropriate|refused|policy|moderation|blocked|violat|内容|安全|违规|拒绝|不当|不合规'; then
+                echo -e "\033[1;33m[提示] 请求可能因内容安全策略被拒，可尝试 /skill 切换至 default-assistant 后重试。\033[0m"
+            fi
             echo -ne "\033[1;33m神经连接似乎有问题，是否重新提交刚才的输入? (y/n): \033[0m"
             read -r retry_choice
             if [[ "$retry_choice" == "y" || "$retry_choice" == "Y" ]]; then
