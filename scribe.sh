@@ -857,7 +857,7 @@ while true; do
                 echo -e "\033[1;36m当前设置:\033[0m"; echo "  - 思考过程显示: $(show_reasoning_status)"; echo "  - 设置文件: $SETTINGS_FILE"
                 continue
             fi
-            if local normalized_toggle; normalized_toggle=$(normalize_toggle_value "$arg"); then
+            if normalized_toggle=$(normalize_toggle_value "$arg"); then
                 SHOW_REASONING="$normalized_toggle"
                 update_setting_boolean "show_reasoning" "$SHOW_REASONING"
                 echo -e "\033[1;32m[系统] 思考过程显示已$( [[ "$SHOW_REASONING" == "true" ]] && echo "开启" || echo "关闭" )，并已写入设置文件。\033[0m"
@@ -869,7 +869,7 @@ while true; do
                 echo -e "\033[1;36m当前设置:\033[0m"; echo "  - AI 推理(Thinking Mode): $(show_ai_thinking_status)"; echo "  - 设置文件: $SETTINGS_FILE"
                 continue
             fi
-            if local normalized_toggle; normalized_toggle=$(normalize_toggle_value "$arg"); then
+            if normalized_toggle=$(normalize_toggle_value "$arg"); then
                 AI_THINKING="$normalized_toggle"
                 update_setting_boolean "ai_thinking" "$AI_THINKING"
                 echo -e "\033[1;32m[系统] AI 推理(Thinking Mode)已$( [[ "$AI_THINKING" == "true" ]] && echo "开启" || echo "关闭" )，并已写入设置文件。\033[0m"
@@ -908,14 +908,12 @@ while true; do
                 echo -e "\033[1;33m用法: /provider <openai|anthropic>\033[0m"
             fi; continue ;;
         /ping)
-            local ping_out ping_err
             ping_out=$(mktemp); ping_err=$(mktemp)
-            local ping_url="${BASE_URL}"
+            ping_url="${BASE_URL}"
             if [[ "$PROVIDER" == "anthropic" ]]; then
                 ping_url="${BASE_URL}/v1/messages"
-                # Anthropic 没有 /models 端点，发一个最小请求测连通
-                local ping_body='{"model":"'"$MODEL"'","max_tokens":1,"messages":[{"role":"user","content":"ping"}]}'
-                local auth_h1_name="" auth_h1_value="" auth_h2_name="" auth_h2_value=""
+                ping_body='{"model":"'"$MODEL"'","max_tokens":1,"messages":[{"role":"user","content":"ping"}]}'
+                auth_h1_name=""; auth_h1_value=""; auth_h2_name=""; auth_h2_value=""
                 _provider_auth_parts
                 curl -sS -X POST "$ping_url" \
                     -H "Content-Type: application/json" \
@@ -928,33 +926,31 @@ while true; do
                     -H "Authorization: Bearer $API_KEY" \
                     -w '\nCURL_HTTP_STATUS:%{http_code}\n' > "$ping_out" 2> "$ping_err"
             fi
-            local status
             status=$(grep -oE 'CURL_HTTP_STATUS:[0-9]+' "$ping_out" | tail -n 1 | cut -d: -f2)
-            local body
             body=$(sed '/CURL_HTTP_STATUS:/d' "$ping_out" | sed '/^[[:space:]]*$/d')
             echo -e "\033[1;36m[Ping] Provider: $PROVIDER | URL: $BASE_URL\033[0m"
             echo -e "\033[1;36m[Ping] HTTP Status: ${status:-unknown}\033[0m"
             if [[ -n "$body" ]]; then
                 if [[ "$PROVIDER" == "openai" ]]; then
-                    local first_model; first_model=$(printf "%s" "$body" | jq -r '.data[0].id // empty' 2>/dev/null)
+                    first_model=$(printf "%s" "$body" | jq -r '.data[0].id // empty' 2>/dev/null)
                     if [[ -n "$first_model" ]]; then
                         echo -e "\033[1;32m[Ping] 可用，示例模型: $first_model\033[0m"
                     else
-                        local api_msg; api_msg=$(printf "%s" "$body" | jq -r '.error.message // .message // empty' 2>/dev/null)
+                        api_msg=$(printf "%s" "$body" | jq -r '.error.message // .message // empty' 2>/dev/null)
                         if [[ -n "$api_msg" ]]; then echo -e "\033[1;31m[Ping] $api_msg\033[0m"
                         else echo -e "\033[1;31m[Ping] $body\033[0m"; fi
                     fi
                 else
-                    local api_msg; api_msg=$(printf "%s" "$body" | jq -r '.error.message // .type // empty' 2>/dev/null)
+                    api_msg=$(printf "%s" "$body" | jq -r '.error.message // .type // empty' 2>/dev/null)
                     if [[ "$api_msg" == "error" ]]; then
-                        local err_text; err_text=$(printf "%s" "$body" | jq -r '.error.message // empty' 2>/dev/null)
+                        err_text=$(printf "%s" "$body" | jq -r '.error.message // empty' 2>/dev/null)
                         echo -e "\033[1;31m[Ping] $err_text\033[0m"
                     else
                         echo -e "\033[1;32m[Ping] 连通性正常。\033[0m"
                     fi
                 fi
             fi
-            local err_text; err_text=$(cat "$ping_err")
+            err_text=$(cat "$ping_err")
             if [[ -n "$err_text" ]]; then echo -e "\033[0;31m$err_text\033[0m"; fi
             rm -f "$ping_out" "$ping_err"; continue ;;
         /read)
