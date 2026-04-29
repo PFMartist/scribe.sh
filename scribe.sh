@@ -420,7 +420,8 @@ cleanup() {
 trap cleanup EXIT
 
 manage_history() {
-    local action="$1" name="$2" target_file="$SAVE_DIR/$name.json"
+    local action="$1" name="$2"
+    local target_file="$SAVE_DIR/$name.json"
     if [[ -z "$name" ]]; then
         echo "用法: $action <对话名称>"; return 1
     fi

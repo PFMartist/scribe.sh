@@ -7,6 +7,9 @@
 # 编辑器 / IDE
 .claude/
 
+# 非公开 skill
+.skills/perlica-style-reply/
+
 # 备份文件
 *.bak
 *.tmp
