@@ -1,0 +1,15 @@
+# 用户私有数据
+.scribe_settings.json
+.scribe_history/
+.scribe_cmd_history
+.scribe_key
+
+# 编辑器 / IDE
+.claude/
+
+# 备份文件
+*.bak
+*.tmp
+
+# macOS
+.DS_Store
