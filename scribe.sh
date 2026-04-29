@@ -35,7 +35,7 @@ CURRENT_SKILL_DESCRIPTION=""
 CURRENT_SKILL_BODY=""
 CURRENT_SKILL_APPENDICES=""
 CURRENT_SKILL_APPENDIX_COUNT=0
-STARTUP_SKILL_NOTE=""
+SKILL_APPENDICES_ENABLED="true"
 SHOW_REASONING="true"
 AI_THINKING="true"
 
@@ -318,7 +318,6 @@ load_skill() {
     skill_name=$(extract_frontmatter_value "$skill_file" "name")
     skill_description=$(extract_frontmatter_value "$skill_file" "description")
     skill_body=$(extract_skill_body "$skill_file")
-    discover_skill_appendices "$skill_dir"
     [[ -z "$skill_name" ]] && skill_name="$skill_id"
     CURRENT_SKILL_ID="$skill_id"
     CURRENT_SKILL_DIR="$skill_dir"
@@ -326,6 +325,9 @@ load_skill() {
     CURRENT_SKILL_NAME="$skill_name"
     CURRENT_SKILL_DESCRIPTION="$skill_description"
     CURRENT_SKILL_BODY="$skill_body"
+    if [[ "$SKILL_APPENDICES_ENABLED" == "true" ]]; then
+        discover_skill_appendices "$skill_dir"
+    fi
     return 0
 }
 
@@ -392,14 +394,12 @@ show_current_skill() {
 auto_load_default_skill() {
     local remembered_skill_id=""
     reset_skill_state
-    STARTUP_SKILL_NOTE=""
     remembered_skill_id=$(read_last_skill_id)
     if [[ -n "$remembered_skill_id" ]] && load_skill "$remembered_skill_id"; then
-        STARTUP_SKILL_NOTE="[系统] 已恢复上次使用的 skill: $remembered_skill_id"
         return 0
     fi
     if [[ -n "$remembered_skill_id" ]]; then
-        STARTUP_SKILL_NOTE="[系统] 上次使用的 skill '$remembered_skill_id' 不存在，已回退到默认 skill。"
+        echo -e "\033[1;33m[系统] 上次使用的 skill '$remembered_skill_id' 不存在，已回退到默认 skill。\033[0m"
     fi
     if [[ -n "$DEFAULT_SKILL_ID" ]] && load_skill "$DEFAULT_SKILL_ID"; then
         save_last_skill_id; return 0
@@ -674,7 +674,7 @@ _handle_completion() {
     local suggestions=()
 
     if [[ $arg_index -eq 0 ]]; then
-        local cmds=("/new" "/clear" "/exit" "/quit" "/help" "/version" "/save" "/load" "/delete" "/del" "/list" "/read" "/skill" "/skill-list" "/skill-show" "/skill-reload" "/think" "/ai-think" "/model" "/key" "/ping" "/provider" "/debug")
+        local cmds=("/new" "/clear" "/exit" "/quit" "/help" "/version" "/save" "/load" "/delete" "/del" "/list" "/read" "/skill" "/skill-list" "/skill-show" "/skill-appendices" "/think" "/ai-think" "/model" "/key" "/ping" "/provider" "/debug")
         for c in "${cmds[@]}"; do
             if [[ "$c" == "$current_word"* ]]; then suggestions+=("$c"); fi
         done
@@ -788,17 +788,12 @@ if [[ -z "$API_KEY" ]]; then
 fi
 
 echo -e "\033[1;32m=== 自动手记人偶 v${VERSION} ===\033[0m"
-echo -e "\033[0;37mProvider: \033[1;36m${PROVIDER}\033[0m | \033[0;37mModel: \033[1;36m${MODEL}\033[0m"
-if [[ -n "$STARTUP_SKILL_NOTE" ]]; then
-    echo -e "\033[0;36m$STARTUP_SKILL_NOTE\033[0m"
-fi
+echo -e "\033[0;37mModel: \033[1;36m${MODEL}\033[0m"
 if [[ -n "$CURRENT_SKILL_ID" ]]; then
-    echo -e "\033[0;36m[系统] 当前已加载 skill: $CURRENT_SKILL_ID\033[0m"
+    echo -e "\033[0;36m[系统] 已加载 skill: $CURRENT_SKILL_ID\033[0m"
 else
     echo -e "\033[0;36m[系统] 当前使用内置默认提示\033[0m"
 fi
-echo -e "\033[0;36m[系统] 思考过程显示: $(show_reasoning_status)\033[0m"
-echo -e "\033[0;36m[系统] AI 推理(Thinking Mode): $(show_ai_thinking_status)\033[0m"
 echo -e "\033[0;36m输入 /help 获取帮助～\033[0m"
 
 while true; do
@@ -834,18 +829,39 @@ while true; do
             list_skills; continue ;;
         /skill-show)
             show_current_skill; continue ;;
-        /skill-reload)
-            if [[ -n "$CURRENT_SKILL_ID" ]]; then
-                if load_skill "$CURRENT_SKILL_ID"; then
-                    init_history
-                    echo -e "\033[1;32m[系统] skill '$CURRENT_SKILL_ID' 已重新加载，并已重置当前对话。\033[0m"
+        /skill-appendices)
+            if [[ -z "$arg" ]]; then
+                if [[ "$SKILL_APPENDICES_ENABLED" == "true" ]]; then
+                    echo -e "\033[1;36m[系统] 附录自动加载：开启。切换 skill 时默认加载附录。\033[0m"
                 else
-                    echo -e "\033[1;31m[错误] 无法重新加载当前 skill '$CURRENT_SKILL_ID'。\033[0m"
+                    echo -e "\033[1;36m[系统] 附录自动加载：关闭。切换 skill 时不会加载附录。\033[0m"
+                fi; continue
+            fi
+            local toggle
+            if toggle=$(normalize_toggle_value "$arg"); then
+                SKILL_APPENDICES_ENABLED="$toggle"
+                if [[ -n "$CURRENT_SKILL_ID" ]]; then
+                    if [[ "$SKILL_APPENDICES_ENABLED" == "true" ]]; then
+                        discover_skill_appendices "$CURRENT_SKILL_DIR"
+                        init_history
+                        echo -e "\033[1;32m[系统] 附录自动加载已开启，已加载 $CURRENT_SKILL_APPENDIX_COUNT 份附录并重置对话。\033[0m"
+                    else
+                        CURRENT_SKILL_APPENDICES=""
+                        CURRENT_SKILL_APPENDIX_COUNT=0
+                        init_history
+                        echo -e "\033[1;32m[系统] 附录自动加载已关闭，已卸载附录并重置对话。\033[0m"
+                    fi
+                else
+                    if [[ "$SKILL_APPENDICES_ENABLED" == "true" ]]; then
+                        echo -e "\033[1;32m[系统] 附录自动加载已开启。下次加载 skill 时将自动加载附录。\033[0m"
+                    else
+                        echo -e "\033[1;32m[系统] 附录自动加载已关闭。下次加载 skill 时将不会加载附录。\033[0m"
+                    fi
                 fi
             else
-                init_history
-                echo -e "\033[1;33m[系统] 当前未加载外部 skill，已按内置默认提示重置对话。\033[0m"
-            fi; continue ;;
+                echo -e "\033[1;33m用法: /skill-appendices <on|off>，不带参数查看当前状态。\033[0m"
+            fi
+            ;;
         /skill)
             if [[ -z "$arg" ]]; then
                 echo -e "\033[1;33m用法: /skill <skill名称>\033[0m"; continue
