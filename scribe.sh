@@ -23,6 +23,10 @@ BASE_SYSTEM_PROMPT="你是一个智能助手。"
 # =======================================
 
 mkdir -p "$SAVE_DIR"
+chmod 700 "$SAVE_DIR" 2>/dev/null
+# 设置文件限制权限，防止 API Key 被其他用户读取
+touch "$SETTINGS_FILE" 2>/dev/null
+chmod 600 "$SETTINGS_FILE" 2>/dev/null
 
 CURRENT_HISTORY=$(mktemp)
 
@@ -314,6 +318,7 @@ load_skill() {
     local skill_dir="$SKILL_ROOT/$skill_id"
     local skill_file="$skill_dir/SKILL.md"
     local skill_name="" skill_description="" skill_body=""
+    if [[ "$skill_id" =~ [/] ]]; then return 1; fi
     if [[ -z "$skill_id" || ! -f "$skill_file" ]]; then return 1; fi
     skill_name=$(extract_frontmatter_value "$skill_file" "name")
     skill_description=$(extract_frontmatter_value "$skill_file" "description")
@@ -422,6 +427,10 @@ trap cleanup EXIT
 manage_history() {
     local action="$1" name="$2"
     local target_file="$SAVE_DIR/$name.json"
+    # 防止路径遍历：仅允许安全字符
+    if [[ "$name" =~ [/] ]]; then
+        echo "错误: 名称包含不安全字符"; return 1;
+    fi
     if [[ -z "$name" ]]; then
         echo "用法: $action <对话名称>"; return 1
     fi
@@ -760,6 +769,7 @@ fi
 # ================= 启动与主循环 =================
 
 HISTFILE="$SCRIPT_DIR/.scribe_cmd_history"
+chmod 600 "$HISTFILE" 2>/dev/null
 HISTSIZE=1000
 HISTFILESIZE=2000
 history -r "$HISTFILE" 2>/dev/null || true
@@ -801,15 +811,18 @@ while true; do
     read -e -r user_input
 
     if [[ -n "$user_input" ]]; then
-        history -s "$user_input" 2>/dev/null || true
-        history -w "$HISTFILE" 2>/dev/null || true
+        # 不将 /key 命令保存到历史，防止 API Key 泄露
+        if [[ "$user_input" != /key* ]]; then
+            history -s "$user_input" 2>/dev/null || true
+            history -w "$HISTFILE" 2>/dev/null || true
+        fi
     fi
 
     cmd=$(echo "$user_input" | awk '{print $1}')
 
     # /read 特殊处理：解析带空格的文件路径
     if [[ "$cmd" == "/read" ]]; then
-        eval "args=($user_input)"
+        read -ra args <<< "$user_input"
         file_path="${args[1]}"
         prompt_msg=""
         for ((i=2; i<${#args[@]}; i++)); do prompt_msg+="${args[$i]} "; done
