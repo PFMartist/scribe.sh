@@ -43,6 +43,16 @@
 
 没有 `pip install`，没有 `npm install`，没有虚拟环境，没有 Docker 镜像。把 `scribe.sh` 放到任意目录，确保 `bash`、`curl`、`jq` 可用，填入 API Key 即可开始使用。
 
+**已测试环境：**
+
+| 环境 | 详情 |
+|------|------|
+| OS | Ubuntu 24.04.4 LTS (x86_64) |
+| Kernel | Linux 6.17.0-22-generic |
+| bash | 5.2.21 |
+| curl | 8.5.0 |
+| jq | 1.7 |
+
 ### 双 API 兼容
 
 同时支持 OpenAI 兼容 API（包括 DeepSeek 等第三方厂商）和 Anthropic 原生 API。`/provider` 命令一键切换，各自独立的 Key、URL 和 Model 配置互不干扰。你可以随时在两者之间切换，对话上下文会被重置以适配新的 API 格式。
